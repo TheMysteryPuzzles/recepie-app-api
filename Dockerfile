@@ -1,5 +1,5 @@
 FROM python:3.7-alpine
-MAINTAINER London App Developer Ltd.
+MAINTAINER Learner.
 ENV PYTHONUNBUFFERED 1
 # Install dependencies
 COPY ./requirements.txt /requirements.txt
