@@ -5,11 +5,25 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Recepie
+from core.models import Recepie, Tag, Ingredient
 
-from recepie.serializers import RecepieSerializer
+from recepie.serializers import RecepieSerializer, RecepieDetailSerializer
 
 RECEPIE_URLS = reverse('recepie:recepie-list')
+
+def sample_tag(user, name='Main course'):
+    """Create and return a sample tag"""
+    return Tag.objects.create(user=user, name=name)
+
+
+def sample_ingredient(user, name='Cinnamon'):
+    """Create and return a sample ingredient"""
+    return Ingredient.objects.create(user=user, name=name)
+
+
+def detail_url(recipe_id):
+    """Return recipe detail URL"""
+    return reverse('recepie:recepie-detail', args=[recipe_id])
 
 
 def sample_recepie(user, **params):
@@ -69,5 +83,18 @@ class PrivateRecepieApiTest(TestCase):
         serializer = RecepieSerializer(recepie, many=True)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data, serializer.data)
+    
+    
+    def test_view_recepie_detail(self):
+        """Test viewing a recipe detail"""
+        recepie = sample_recepie(user=self.user)
+        recepie.tags.add(sample_tag(user=self.user))
+        recepie.ingredients.add(sample_ingredient(user=self.user))
+
+        url = detail_url(recepie.id)
+        res = self.client.get(url)
+
+        serializer = RecepieDetailSerializer(recepie)
         self.assertEqual(res.data, serializer.data)
         

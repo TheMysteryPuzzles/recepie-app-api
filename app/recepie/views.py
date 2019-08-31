@@ -31,6 +31,7 @@ class IngredientViewSet(BaseRecepieAttrViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = serializers.IngredientSerializer
     
+
 class RecepieViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.RecepieSerializer
     queryset = Recepie.objects.all()
@@ -40,3 +41,8 @@ class RecepieViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return self.queryset.filter(user=self.request.user)
     
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.RecepieDetailSerializer
+        
+        return self.serializer_class
