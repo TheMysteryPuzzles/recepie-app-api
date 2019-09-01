@@ -1,3 +1,8 @@
+import tempfile
+import os
+
+from PIL import Image
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -10,6 +15,12 @@ from core.models import Recepie, Tag, Ingredient
 from recepie.serializers import RecepieSerializer, RecepieDetailSerializer
 
 RECEPIE_URLS = reverse('recepie:recepie-list')
+
+
+def image_upload_url(recipe_id):
+    """Return URL for recipe image upload"""
+    return reverse('recepie:recepie-upload-image', args=[recipe_id])
+
 
 def sample_tag(user, name='Main course'):
     """Create and return a sample tag"""
@@ -35,6 +46,7 @@ def sample_recepie(user, **params):
     defaults.update(params)
     return Recepie.objects.create(user=user, **defaults)
 
+
 class PublicRecepieApiTest(TestCase):
     
     def setUp(self):
@@ -44,6 +56,7 @@ class PublicRecepieApiTest(TestCase):
         res = self.client.get(RECEPIE_URLS)
         
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)    
+
 
 class PrivateRecepieApiTest(TestCase):
     
@@ -85,7 +98,6 @@ class PrivateRecepieApiTest(TestCase):
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data, serializer.data)
     
-    
     def test_view_recepie_detail(self):
         """Test viewing a recipe detail"""
         recepie = sample_recepie(user=self.user)
@@ -97,7 +109,6 @@ class PrivateRecepieApiTest(TestCase):
 
         serializer = RecepieDetailSerializer(recepie)
         self.assertEqual(res.data, serializer.data)
-    
     
     def test_create_basic_recipe(self):
         """Test creating recipe"""
@@ -188,4 +199,36 @@ class PrivateRecepieApiTest(TestCase):
         self.assertEqual(recipe.price, payload['price'])
         tags = recipe.tags.all()
         self.assertEqual(len(tags), 0)
-            
+        
+    
+class RecipeImageUploadTests(TestCase):
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user('user', 'testpass')
+        self.client.force_authenticate(self.user)
+        self.recepie = sample_recepie(user=self.user)
+
+    def tearDown(self):
+        self.recepie.image.delete()
+
+    def test_upload_image_to_recipe(self):
+        """Test uploading an image to recipe"""
+        url = image_upload_url(self.recepie.id)
+        with tempfile.NamedTemporaryFile(suffix='.jpg') as ntf:
+            img = Image.new('RGB', (10, 10))
+            img.save(ntf, format='JPEG')
+            ntf.seek(0)
+            res = self.client.post(url, {'image': ntf}, format='multipart')
+
+        self.recepie.refresh_from_db()
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('image', res.data)
+        self.assertTrue(os.path.exists(self.recepie.image.path))
+
+    def test_upload_image_bad_request(self):
+        """Test uploading an invalid image"""
+        url = image_upload_url(self.recepie.id)
+        res = self.client.post(url, {'image': 'notimage'}, format='multipart')
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
